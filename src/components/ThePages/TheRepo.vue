@@ -1,72 +1,84 @@
 <template>
-  <div class="repo-box">
-    <router-view></router-view>
-    <Search @onSearchRepo="searchRepos" />
-    <div class="repo-section">
-      <div v-for="repo in repos" :key="repo.id" class="repo-hold">
-        <p>
-          <b
-            >Project id: <router-link :to="`/repo/${repo.name}`">{{ repo.name }}</router-link></b
-          >
-        </p>
-        <hr />
-        <p><b>Project name:</b> {{ repo.name }}</p>
-        <p>{{ repo.description || 'No description' }}</p>
-        <a :href="repo.html_url" target="_blank" rel="noopener noreferrer"> View on GitHub </a>
+  <TheErrorBoundary>
+    <div class="repo-box">
+      <router-view></router-view>
+      <div class="search-box">
+        <input type="text" v-model="searchQuery" placeholder="Search for repositories..." />
+        <button @click="searchRepos">Search</button>
+      </div>
+      <div class="repo-section">
+        <div v-for="repo in repos" :key="repo.id" class="repo-hold">
+          <p>
+            <b>
+              Project id: <router-link :to="`/repo/${repo.name}`">{{ repo.name }}</router-link>
+            </b>
+          </p>
+          <hr />
+          <p><b>Project name:</b> {{ repo.name }}</p>
+          <p>{{ repo.description || 'No description' }}</p>
+          <a :href="repo.html_url" target="_blank" rel="noopener noreferrer"> View on GitHub </a>
+        </div>
+      </div>
+      <button @click="toggleModal">Create Repo</button>
+      <div class="button-box">
+        <button @click="prevPage" :disabled="page === 1">Previous Page</button>
+        <button @click="nextPage">Next Page</button>
+      </div>
+      <p v-if="loading">Loading...</p>
+      <p v-if="lastPage">You have reached the last page of repositories.</p>
+      <p v-if="errorMessage" class="error-message">{{ errorMessage }}</p>
+      <ul>
+        <li v-for="repos in repos2" :key="repos.id">
+          <a :href="repos.html_url" target="_blank" rel="noopener noreferrer">{{
+            repos.full_name
+          }}</a>
+        </li>
+      </ul>
+      <div v-if="isModalOpen" class="modal">
+        <div class="modal-content">
+          <span class="close" @click="toggleModal">&times;</span>
+          <h2>Create a New Repository</h2>
+          <form @submit.prevent="handleSubmit">
+            <div class="input-form">
+              <label for="repoName">Repository Name:</label>
+              <input type="text" id="repoName" v-model="repoName" required />
+            </div>
+            <div class="text-area-form">
+              <label for="repoDescription">Description:</label>
+              <textarea id="repoDescription" v-model="repoDescription"></textarea>
+            </div>
+            <button type="submit" class="repo-button">Create Repository</button>
+          </form>
+          <p v-if="successMessage" class="success-message">{{ successMessage }}</p>
+          <p v-if="errorMessage" class="error-message">{{ errorMessage }}</p>
+        </div>
       </div>
     </div>
-    <button @click="toggleModal">Create Repo</button>
-    <div class="button-box">
-      <button @click="prevPage" :disabled="page === 1">Previous Page</button>
-      <button @click="nextPage">Next Page</button>
-    </div>
-    <p v-if="loading">Loading...</p>
-    <ul>
-      <li v-for="repos in repos2" :key="repos.id">
-        <a :href="repos.html_url" target="_blank" rel="noopener noreferrer">{{
-          repos.full_name
-        }}</a>
-      </li>
-    </ul>
-    <div v-if="isModalOpen" class="modal">
-      <div class="modal-content">
-        <span class="close" @click="toggleModal">&times;</span>
-        <h2>Create a New Repository</h2>
-        <form @submit.prevent="handleSubmit">
-          <div class="input-form">
-            <label for="repoName">Repository Name:</label>
-            <input type="text" id="repoName" v-model="repoName" required />
-          </div>
-          <div class="text-area-form">
-            <label for="repoDescription">Description:</label>
-            <textarea id="repoDescription" v-model="repoDescription"></textarea>
-          </div>
-          <button type="submit" class="repo-button">Create Repository</button>
-        </form>
-        <p v-if="responseMessage">{{ responseMessage }}</p>
-      </div>
-    </div>
-  </div>
+  </TheErrorBoundary>
 </template>
 
 <script>
 import axios from 'axios'
-import TheSearch from './TheSearch.vue'
+import TheErrorBoundary from './TheErrorBoundary.vue'
 
 export default {
   name: 'TheRepo',
-  components: TheSearch,
-
+  components: {
+    TheErrorBoundary
+  },
   data() {
     return {
       repos: [],
       repos2: [],
       loading: false,
       page: 1,
+      lastPage: false,
       repoName: '',
       repoDescription: '',
-      responseMessage: '',
-      isModalOpen: false
+      successMessage: '',
+      errorMessage: '',
+      isModalOpen: false,
+      searchQuery: ''
     }
   },
   mounted() {
@@ -81,7 +93,8 @@ export default {
   },
   methods: {
     async fetchRepos() {
-      const perPage = 5
+      const perPage = 6
+      this.loading = true
       try {
         const response = await fetch(
           `https://api.github.com/users/Princessinyaba/repos?page=${this.page}&per_page=${perPage}`
@@ -90,31 +103,46 @@ export default {
         if (response.ok) {
           const data = await response.json()
           this.repos = data
+          // Check if the number of repos fetched is less than perPage, indicating last page
+          this.lastPage = data.length < perPage
         } else {
-          console.error('Failed to fetch repositories')
+          this.handleError('Failed to fetch repositories')
         }
       } catch (error) {
-        console.error('Error fetching repositories:', error)
+        this.handleError('Error fetching repositories:', error)
+      } finally {
+        this.loading = false
       }
     },
-    async searchRepos(query) {
+    async searchRepos() {
+      if (!this.searchQuery) {
+        this.fetchRepos()
+        return
+      }
+
       this.loading = true
       try {
-        const response = await fetch(`https://api.github.com/search/repositories?q=${query}`)
+        const response = await fetch(
+          `https://api.github.com/search/repositories?q=user:Princessinyaba+${this.searchQuery}`
+        )
 
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`)
         }
 
         const data = await response.json()
+        if (data.items.length === 0) {
+          throw new Error(`No repositories found for "${this.searchQuery}"`)
+        }
         this.repos2 = data.items
       } catch (error) {
-        console.error('Error searching repositories:', error)
+        this.handleError(`Error searching repositories: ${error.message}`)
       } finally {
         this.loading = false
       }
     },
     async handleSubmit() {
+      this.loading = true
       const data = {
         name: this.repoName,
         description: this.repoDescription,
@@ -133,12 +161,27 @@ export default {
         const response = await axios.post('https://api.github.com/user/repos', data, { headers })
 
         if (response.status === 201) {
-          this.responseMessage = 'Repository created successfully.'
+          this.successMessage = `Repository created successfully.`
+          this.errorMessage = '' // Clear any previous error message
           this.isModalOpen = false
+
+          // Clear success message after 5 seconds
+          setTimeout(() => {
+            this.successMessage = ''
+          }, 5000)
         }
       } catch (error) {
-        this.responseMessage = `Failed to create repository: ${error.message}`
+        this.errorMessage = `Failed to create repository: ${error.message}` // Set error message
+      } finally {
+        this.loading = false
       }
+    },
+
+    handleError(message) {
+      this.errorMessage = message
+      setTimeout(() => {
+        this.errorMessage = ''
+      }, 5000)
     },
     toggleModal() {
       this.isModalOpen = !this.isModalOpen
@@ -173,6 +216,10 @@ body {
 
 .repo-box {
   padding: 20px;
+}
+
+.search-box {
+  margin-bottom: 20px;
 }
 
 .repo-section {
@@ -244,5 +291,9 @@ body {
 
 .repo-button:hover {
   background-color: #0056b3;
+}
+
+.error-message {
+  color: red;
 }
 </style>

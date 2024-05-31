@@ -1,13 +1,21 @@
 <template>
-  <div class="error-page">
-    <h1>Error {{ errorCode }}</h1>
-    <p>{{ errorMessage }}</p>
-    <router-link to="/">Back to Home</router-link>
-  </div>
+  <TheErrorBoundary>
+    <div class="error-page">
+      <h1>Error Page {{ errorCode }}</h1>
+      <p>{{ errorMessage }}</p>
+      <router-link to="/">Back to Home</router-link>
+    </div>
+  </TheErrorBoundary>
 </template>
 
 <script>
+import TheErrorBoundary from './TheErrorBoundary.vue'
+
 export default {
+  name: 'ErrorPage',
+  components: {
+    TheErrorBoundary
+  },
   props: {
     errorCode: {
       type: Number,
@@ -17,8 +25,7 @@ export default {
       type: String,
       default: 'Page Not Found'
     }
-  },
-  name: 'ErrorPage'
+  }
 }
 </script>
 
