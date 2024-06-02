@@ -5,6 +5,7 @@ import TheRepo from './components/ThePages/TheRepo.vue'
 import TheErrorPage from './components/ThePages/TheErrorPage.vue'
 import TheErrorBoundary from './components/ThePages/TheErrorBoundary.vue'
 import TheSuccessPage from './components/ThePages/TheSuccessPage.vue'
+import EditRepositoryModal from './components/ThePages/EditRepositoryModal.vue'
 import TheSearch from './components/ThePages/TheSearch.vue'
 import TheSingleRepo from './components/ThePages/TheSingleRepo.vue'
 import { createRouter, createWebHistory } from 'vue-router'
@@ -21,6 +22,7 @@ const router = createRouter({
     { path: '/repo', component: TheErrorBoundary, props: { component: TheRepo } },
     { path: '/successpage', component: TheSuccessPage },
     { path: '/search', component: TheSearch },
+    { path: '/editrepository', component: EditRepositoryModal },
     { path: '/repo/:reponame', component: TheSingleRepo }
   ]
 })

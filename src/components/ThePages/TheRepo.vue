@@ -17,6 +17,7 @@
           <p><b>Project name:</b> {{ repo.name }}</p>
           <p>{{ repo.description || 'No description' }}</p>
           <a :href="repo.html_url" target="_blank" rel="noopener noreferrer"> View on GitHub </a>
+          <button @click="openEditModal(repo)">Edit</button>
         </div>
       </div>
       <button @click="toggleModal">Create Repo</button>
@@ -49,10 +50,15 @@
             </div>
             <button type="submit" class="repo-button">Create Repository</button>
           </form>
-          <p v-if="successMessage" class="success-message">{{ successMessage }}</p>
-          <p v-if="errorMessage" class="error-message">{{ errorMessage }}</p>
         </div>
       </div>
+      <p v-if="successMessage" class="success-message">{{ successMessage }}</p>
+      <p v-if="errorMessage" class="error-message">{{ errorMessage }}</p>
+      <EditRepositoryModal
+        v-if="isEditModalOpen"
+        :repository="selectedRepo"
+        @close="closeEditModal"
+      />
     </div>
   </TheErrorBoundary>
 </template>
@@ -60,11 +66,13 @@
 <script>
 import axios from 'axios'
 import TheErrorBoundary from './TheErrorBoundary.vue'
+import EditRepositoryModal from './EditRepositoryModal.vue'
 
 export default {
   name: 'TheRepo',
   components: {
-    TheErrorBoundary
+    TheErrorBoundary,
+    EditRepositoryModal
   },
   data() {
     return {
@@ -78,6 +86,8 @@ export default {
       successMessage: '',
       errorMessage: '',
       isModalOpen: false,
+      isEditModalOpen: false,
+      selectedRepo: null,
       searchQuery: ''
     }
   },
@@ -161,22 +171,27 @@ export default {
         const response = await axios.post('https://api.github.com/user/repos', data, { headers })
 
         if (response.status === 201) {
-          this.successMessage = `Repository created successfully.`
+          this.successMessage = 'Repository created successfully.'
           this.errorMessage = '' // Clear any previous error message
+          this.repoName = ''
+          this.repoDescription = ''
           this.isModalOpen = false
 
           // Clear success message after 5 seconds
           setTimeout(() => {
             this.successMessage = ''
           }, 5000)
+
+          this.fetchRepos() // Refresh the repository list
+        } else {
+          this.handleError(`Failed to create repository: ${response.statusText}`)
         }
       } catch (error) {
-        this.errorMessage = `Failed to create repository: ${error.message}` // Set error message
+        this.handleError(`Failed to create repository: ${error.message}`)
       } finally {
         this.loading = false
       }
     },
-
     handleError(message) {
       this.errorMessage = message
       setTimeout(() => {
@@ -185,6 +200,8 @@ export default {
     },
     toggleModal() {
       this.isModalOpen = !this.isModalOpen
+      this.successMessage = ''
+      this.errorMessage = ''
     },
     nextPage() {
       this.page++
@@ -201,6 +218,15 @@ export default {
       if (event.target === modal) {
         this.toggleModal()
       }
+    },
+    openEditModal(repo) {
+      this.selectedRepo = repo
+      this.isEditModalOpen = true
+    },
+    closeEditModal() {
+      this.isEditModalOpen = false
+      this.selectedRepo = null
+      this.fetchRepos() // Refresh the repository list after editing
     }
   }
 }
@@ -262,18 +288,13 @@ body {
   width: 80%;
 }
 
-.close {
-  color: #aaa;
-  float: right;
-  font-size: 28px;
-  font-weight: bold;
+.success-message {
+  color: green;
+  margin-top: 10px;
 }
 
-.close:hover,
-.close:focus {
-  color: black;
-  text-decoration: none;
-  cursor: pointer;
+.error-message {
+  color: red;
 }
 
 .input-form,
@@ -291,9 +312,5 @@ body {
 
 .repo-button:hover {
   background-color: #0056b3;
-}
-
-.error-message {
-  color: red;
 }
 </style>
